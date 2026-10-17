@@ -1,0 +1,199 @@
+@import "tailwindcss";
+/* ==========================================================================
+   Memora Admin theme — operations console.
+   Shares the core Memora palette but leans denser/neutral for long
+   working sessions. Single source of truth for the admin color system.
+   ========================================================================== */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* --------------------------------------------------------------------------
+   1. Semantic tokens
+   -------------------------------------------------------------------------- */
+:root {
+  --m-bg-base: #f7f7f8;
+  --m-bg-surface: #ffffff;
+  --m-bg-elevated: #ffffff;
+  --m-bg-muted: #f1f1f3;
+  --m-bg-inverse: #15121a;
+
+  --m-line: #e7e7ea;
+  --m-line-strong: #d6d6db;
+
+  --m-tx-1: #1c1a20;
+  --m-tx-2: #4b4952;
+  --m-tx-3: #6d6a75;
+  --m-tx-4: #96939c;
+
+  --m-primary: #d41e45;
+  --m-primary-strong: #b3153a;
+  --m-primary-soft: #fde8ec;
+  --m-on-primary: #ffffff;
+
+  --m-accent: #fbbf24;
+  --m-accent-strong: #b45309;
+  --m-accent-soft: #fef3c7;
+  --m-on-accent: #2a1519;
+
+  --m-ring: #f0647f;
+
+  /* Sidebar (slightly distinct from canvas) */
+  --m-sidebar: #ffffff;
+  --m-sidebar-active: var(--m-primary-soft);
+
+  --m-grad-brand: linear-gradient(135deg, #e8294f 0%, #b3153a 100%);
+  --m-scrim: rgb(21 18 26 / 0.5);
+}
+
+.dark {
+  --m-bg-base: #121016;
+  --m-bg-surface: #1a1720;
+  --m-bg-elevated: #211d29;
+  --m-bg-muted: #262230;
+  --m-bg-inverse: #0b0910;
+
+  --m-line: #322d3d;
+  --m-line-strong: #453f52;
+
+  --m-tx-1: #f3f1f6;
+  --m-tx-2: #c4c0cc;
+  --m-tx-3: #9b96a5;
+  --m-tx-4: #7d7887;
+
+  --m-primary: #fb7185;
+  --m-primary-strong: #fda4af;
+  --m-primary-soft: rgb(244 63 94 / 0.18);
+  --m-on-primary: #1a0b0e;
+
+  --m-accent: #fbbf24;
+  --m-accent-strong: #fcd34d;
+  --m-accent-soft: rgb(251 191 36 / 0.16);
+  --m-on-accent: #2a1519;
+
+  --m-ring: #fda4af;
+
+  --m-sidebar: #1a1720;
+  --m-sidebar-active: rgb(244 63 94 / 0.16);
+
+  --m-scrim: rgb(0 0 0 / 0.6);
+}
+
+/* --------------------------------------------------------------------------
+   2. Tailwind theme mapping
+   -------------------------------------------------------------------------- */
+@theme inline {
+  --color-app: var(--m-bg-base);
+  --color-surface: var(--m-bg-surface);
+  --color-elevated: var(--m-bg-elevated);
+  --color-muted: var(--m-bg-muted);
+  --color-inverse: var(--m-bg-inverse);
+  --color-line: var(--m-line);
+  --color-line-strong: var(--m-line-strong);
+  --color-1: var(--m-tx-1);
+  --color-2: var(--m-tx-2);
+  --color-3: var(--m-tx-3);
+  --color-4: var(--m-tx-4);
+  --color-primary: var(--m-primary);
+  --color-primary-strong: var(--m-primary-strong);
+  --color-primary-soft: var(--m-primary-soft);
+  --color-on-primary: var(--m-on-primary);
+  --color-accent: var(--m-accent);
+  --color-accent-strong: var(--m-accent-strong);
+  --color-accent-soft: var(--m-accent-soft);
+  --color-on-accent: var(--m-on-accent);
+  --color-ring: var(--m-ring);
+  --color-sidebar: var(--m-sidebar);
+  --color-sidebar-active: var(--m-sidebar-active);
+  --color-scrim: var(--m-scrim);
+
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  --font-display:
+    "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+}
+
+@theme {
+  --color-memora-500: #f43f5e;
+  --color-memora-600: #d41e45;
+  --color-memora-700: #b3153a;
+
+  --color-ink-900: #1a1113;
+  --color-ink-950: #0e0809;
+
+  --shadow-card:
+    0 1px 2px rgb(21 18 26 / 0.05), 0 4px 16px -4px rgb(21 18 26 / 0.08);
+  --shadow-pop: 0 8px 32px -8px rgb(21 18 26 / 0.22);
+
+  --animate-fade-in: fade-in 0.16s ease-out both;
+  --animate-rise: rise 0.2s ease-out both;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* --------------------------------------------------------------------------
+   3. Global element styles
+   -------------------------------------------------------------------------- */
+html {
+  -webkit-text-size-adjust: 100%;
+  scrollbar-gutter: stable;
+}
+
+body {
+  @apply bg-app text-1 antialiased;
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--m-primary-soft);
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--m-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.bg-gradient-brand {
+  background-image: var(--m-grad-brand);
+}
+.text-gradient-brand {
+  background-image: var(--m-grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

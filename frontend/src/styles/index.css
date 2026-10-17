@@ -1,0 +1,261 @@
+@import "tailwindcss";
+/* ==========================================================================
+   Memora theme — SINGLE SOURCE OF TRUTH for the entire color system.
+   Crimson edition v2 (deeper red, neutral warm canvas, gold accent).
+   Change the values in this one file to repaint the whole app (light+dark).
+   ==========================================================================
+   Layers:
+     1. Semantic CSS custom properties  (:root light / .dark overrides)
+     2. Tailwind v4 @theme mapping      (generates bg-surface, text-1, ...)
+     3. Brand palettes (literal, both modes) + shadows/radii/animations
+     4. Global element styles
+   ========================================================================== */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* --------------------------------------------------------------------------
+   1. Semantic tokens
+   -------------------------------------------------------------------------- */
+:root {
+  /* Surfaces */
+  --m-bg-base: #faf8f7; /* app background — neutral warm white */
+  --m-bg-surface: #ffffff; /* cards, panels */
+  --m-bg-elevated: #ffffff; /* popovers, dialogs */
+  --m-bg-muted: #f3efee; /* subtle fills, hover states */
+  --m-bg-inverse: #170f10; /* immersive dark: viewers, story, calls */
+
+  /* Lines */
+  --m-line: #ebe5e3;
+  --m-line-strong: #ddd3d0;
+
+  /* Text */
+  --m-tx-1: #2a1519; /* headings, primary text */
+  --m-tx-2: #5c4348; /* body text */
+  --m-tx-3: #785b61; /* secondary text */
+  --m-tx-4: #9f7e83; /* placeholders, timestamps */
+
+  /* Primary (deep crimson) */
+  --m-primary: #d41e45;
+  --m-primary-strong: #b3153a;
+  --m-primary-soft: #fde8ec; /* tinted fills, chips, default avatars */
+  --m-on-primary: #ffffff; /* text on primary */
+
+  /* Accent (warm gold) — small pops: new dots, badges, highlights */
+  --m-accent: #fbbf24;
+  --m-accent-strong: #b45309; /* gold for text/icons on light backgrounds */
+  --m-accent-soft: #fef3c7; /* tinted fills, chips */
+  --m-on-accent: #2a1519; /* text on gold (always dark) */
+
+  --m-ring: #f0647f; /* focus outline */
+
+  /* Signature gradients (use sparingly: logo + story ring) */
+  --m-grad-brand: linear-gradient(135deg, #e8294f 0%, #b3153a 100%);
+  --m-grad-story: linear-gradient(135deg, #f0647f 0%, #d41e45 55%, #9f1239 100%);
+  --m-grad-story-seen: linear-gradient(135deg, #ddd3d0, #ddd3d0);
+
+  /* Misc */
+  --m-scrim: rgb(23 15 16 / 0.55); /* modal/overlay backdrop */
+}
+
+.dark {
+  --m-bg-base: #150e10;
+  --m-bg-surface: #1e1417;
+  --m-bg-elevated: #281b1f;
+  --m-bg-muted: #322227;
+  --m-bg-inverse: #0c0708;
+
+  --m-line: #3a2a2e;
+  --m-line-strong: #4d3a3f;
+
+  --m-tx-1: #fbeff0;
+  --m-tx-2: #cdb5b9;
+  --m-tx-3: #a38a8f;
+  --m-tx-4: #93797f;
+
+  --m-primary: #fb7185;
+  --m-primary-strong: #fda4af; /* hover: even lighter in dark */
+  --m-primary-soft: rgb(244 63 94 / 0.18);
+  --m-on-primary: #1a0b0e;
+
+  --m-accent: #fbbf24;
+  --m-accent-strong: #fcd34d;
+  --m-accent-soft: rgb(251 191 36 / 0.16);
+  --m-on-accent: #2a1519;
+
+  --m-ring: #fda4af;
+
+  --m-grad-story-seen: linear-gradient(135deg, #4d3a3f, #4d3a3f);
+
+  --m-scrim: rgb(0 0 0 / 0.65);
+}
+
+/* --------------------------------------------------------------------------
+   2. Tailwind theme mapping (@theme inline → wires utilities to the vars)
+   -------------------------------------------------------------------------- */
+@theme inline {
+  /* "app" not "base" — --color-base would hijack Tailwind's
+     font-size utility text-base and paint headings background-colored */
+  --color-app: var(--m-bg-base);
+  --color-surface: var(--m-bg-surface);
+  --color-elevated: var(--m-bg-elevated);
+  --color-muted: var(--m-bg-muted);
+  --color-inverse: var(--m-bg-inverse);
+  --color-line: var(--m-line);
+  --color-line-strong: var(--m-line-strong);
+  --color-1: var(--m-tx-1);
+  --color-2: var(--m-tx-2);
+  --color-3: var(--m-tx-3);
+  --color-4: var(--m-tx-4);
+  --color-primary: var(--m-primary);
+  --color-primary-strong: var(--m-primary-strong);
+  --color-primary-soft: var(--m-primary-soft);
+  --color-on-primary: var(--m-on-primary);
+  --color-accent: var(--m-accent);
+  --color-accent-strong: var(--m-accent-strong);
+  --color-accent-soft: var(--m-accent-soft);
+  --color-on-accent: var(--m-on-accent);
+  --color-ring: var(--m-ring);
+  --color-scrim: var(--m-scrim);
+
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  --font-display:
+    "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+}
+
+/* --------------------------------------------------------------------------
+   3. Brand palettes (literal in BOTH modes — gradients / immersive dark)
+   -------------------------------------------------------------------------- */
+@theme {
+  /* Memora crimson scale — kept for gradient math & accents */
+  --color-memora-50: #fff1f2;
+  --color-memora-100: #ffe4e6;
+  --color-memora-200: #fecdd3;
+  --color-memora-300: #fda4af;
+  --color-memora-400: #fb7185;
+  --color-memora-500: #f43f5e;
+  --color-memora-600: #d41e45;
+  --color-memora-700: #b3153a;
+  --color-memora-800: #9f1239;
+  --color-memora-900: #881337;
+  --color-memora-950: #4c0519;
+
+  /* Gold — the warm highlight next to the red */
+  --color-gold-100: #fef3c7;
+  --color-gold-200: #fde68a;
+  --color-gold-400: #fbbf24;
+  --color-gold-500: #f59e0b;
+  --color-gold-600: #d97706;
+  --color-gold-700: #b45309;
+
+  /* Immersive dark (viewers, calls) — literal, mode-independent */
+  --color-ink-900: #1a1113;
+  --color-ink-950: #0e0809;
+
+  --shadow-card:
+    0 1px 2px rgb(42 21 25 / 0.06), 0 4px 16px -4px rgb(42 21 25 / 0.1);
+  --shadow-pop: 0 8px 32px -8px rgb(42 21 25 / 0.22);
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+
+  --animate-fade-in: fade-in 0.18s ease-out both;
+  --animate-rise: rise 0.24s ease-out both;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* --------------------------------------------------------------------------
+   4. Global element styles
+   -------------------------------------------------------------------------- */
+html {
+  -webkit-text-size-adjust: 100%;
+  /* Always reserve the scrollbar gutter so the centred shell (and its
+     sidebar) never shifts when a page does/doesn't scroll. */
+  scrollbar-gutter: stable;
+}
+
+body {
+  @apply bg-app text-1 antialiased;
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--m-primary-soft);
+}
+
+/* Accessible focus indicator everywhere */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--m-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Brand gradient helpers (usable as bg-gradient-brand) */
+.bg-gradient-brand {
+  background-image: var(--m-grad-brand);
+}
+.text-gradient-brand {
+  background-image: var(--m-grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Default avatar (no photo): soft tint with crimson initials,
+   so solid red stays reserved for buttons, active states and likes. */
+.avatar-default {
+  background: var(--m-primary-soft);
+  color: var(--m-primary-strong);
+}
+
+/* Story ring: wrap an avatar in .story-ring > .story-ring-gap.
+   Add .seen to the ring once a story has been viewed. */
+.story-ring {
+  background: var(--m-grad-story);
+  border-radius: 9999px;
+  padding: 2.5px;
+}
+.story-ring.seen {
+  background: var(--m-grad-story-seen);
+}
+.story-ring-gap {
+  background: var(--m-bg-base);
+  border-radius: 9999px;
+  padding: 2px;
+}
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

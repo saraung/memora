@@ -1,0 +1,66 @@
+# Memora local/prod-like stack. Copy backend/.env.example (and set real
+# secrets) to backend/.env before first boot; same for the frontend.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: memora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+      POSTGRES_DB: memora
+    ports:
+      - "5433:5432"
+    volumes:
+      - memora_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memora -d memora"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - memora_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://memora:${POSTGRES_PASSWORD:-change_me}@db:5432/memora
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: development
+
+  frontend:
+    image: node:24-slim
+    working_dir: /srv/app
+    command: ["sh", "-c", "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173"]
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/srv/app
+      - /srv/app/node_modules
+    environment:
+      VITE_API_BASE_URL: /api/v1
+      VITE_PROXY_TARGET: http://backend:8000
+
+volumes:
+  memora_pgdata:
+  memora_redisdata:
