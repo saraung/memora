@@ -16,7 +16,7 @@ export function SettingsPage() {
         description="Console configuration and your staff access."
       />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-line bg-surface p-5 shadow-card">
           <h2 className="flex items-center gap-2 text-sm font-bold text-1">
             <SettingsIcon className="size-4 text-3" aria-hidden /> Console

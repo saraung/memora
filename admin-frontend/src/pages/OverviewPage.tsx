@@ -20,6 +20,8 @@ import {
 } from "@/components/charts";
 import { useOverviewStats } from "@/features/analytics/hooks";
 import { useOverview } from "@/features/reports/hooks";
+import { useHasPermission } from "@/features/auth/useAuth";
+import { PERM } from "@/lib/permissions";
 import { actionLabel, categoryLabel, roleLabel } from "@/lib/labels";
 import { timeAgo, shortId } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -30,7 +32,8 @@ const RANGES = [7, 14, 30];
 export function OverviewPage() {
   const [days, setDays] = useState(14);
   const stats = useOverviewStats(days);
-  const { activity, pendingCount } = useOverview();
+  const canAudit = useHasPermission(PERM.AUDIT_READ);
+  const { activity, pendingCount } = useOverview(canAudit);
 
   const data = stats.data;
   const contentMix: CountItem[] = data
@@ -82,7 +85,7 @@ export function OverviewPage() {
         />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 lg:gap-6 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Total accounts"
               value={data?.accounts.total ?? 0}
@@ -123,7 +126,7 @@ export function OverviewPage() {
             />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:gap-6 lg:grid-cols-3">
             <ChartCard
               title="New signups"
               subtitle={`Accounts created in the last ${days} days`}
@@ -154,7 +157,7 @@ export function OverviewPage() {
             </ChartCard>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:gap-6 lg:grid-cols-2">
             <ChartCard
               title="Content created"
               subtitle={`Posts published in the last ${days} days`}
@@ -184,7 +187,7 @@ export function OverviewPage() {
             </ChartCard>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:gap-6 lg:grid-cols-2">
             <ChartCard title="Content mix" subtitle="Everything on the platform">
               {stats.isPending ? (
                 <Skeleton className="h-[160px] w-full" />
@@ -206,6 +209,7 @@ export function OverviewPage() {
             </ChartCard>
           </div>
 
+          {canAudit && (
           <section className="rounded-xl border border-line bg-surface shadow-card">
             <header className="flex items-center justify-between gap-2 border-b border-line px-5 py-3.5">
               <div className="flex items-center gap-2">
@@ -267,6 +271,7 @@ export function OverviewPage() {
               </ul>
             )}
           </section>
+          )}
         </>
       )}
     </div>

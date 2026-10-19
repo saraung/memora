@@ -75,7 +75,7 @@ export function AnalyticsPage() {
         />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 lg:gap-6 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Accounts"
               value={data?.accounts.total ?? 0}
@@ -122,7 +122,7 @@ export function AnalyticsPage() {
             )}
           </ChartCard>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:gap-6 lg:grid-cols-2">
             <ChartCard
               title="Posts created"
               subtitle={`Published per day · last ${days} days`}
@@ -156,7 +156,7 @@ export function AnalyticsPage() {
             </ChartCard>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:gap-6 lg:grid-cols-2">
             <ChartCard title="Reports by reason" subtitle="All time">
               {stats.isPending ? (
                 <Skeleton className="h-[240px] w-full" />
@@ -183,7 +183,7 @@ export function AnalyticsPage() {
             </ChartCard>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:gap-6 lg:grid-cols-3">
             <ChartCard title="Content mix" subtitle="All time">
               {stats.isPending ? (
                 <Skeleton className="h-[180px] w-full" />

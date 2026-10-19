@@ -5,17 +5,19 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlmodel import Session
 
 from app.api.pagination import PageResponse
 from app.application.pagination import decode_cursor, encode_cursor
 from app.application.services import moderation_service, stats_service
 from app.core.exceptions import (
+    ForbiddenError,
     ResourceNotFoundError,
     ValidationError,
 )
 from app.core.middleware import get_request_id
+from app.domain.enums import ModerationDecision
 from app.infrastructure.database.models.user import User
 from app.infrastructure.database.repositories import (
     audit_repository,
@@ -26,7 +28,10 @@ from app.infrastructure.database.repositories import (
 from app.infrastructure.database.session import get_session
 from app.modules.admin import schemas
 from app.modules.authorization import permissions as perm
-from app.modules.authorization.dependencies import require_permission
+from app.modules.authorization.dependencies import (
+    require_any_permission,
+    require_permission,
+)
 from app.modules.moderation import schemas as mod_schemas
 from app.modules.users.schemas import UserSummary
 
@@ -38,6 +43,11 @@ require_users_read = require_permission(perm.USERS_READ)
 require_users_suspend = require_permission(perm.USERS_SUSPEND)
 require_staff_manage = require_permission(perm.STAFF_MANAGE)
 require_audit_read = require_permission(perm.AUDIT_READ)
+
+# Shared by the Overview and Analytics dashboards.
+require_stats_read = require_any_permission(
+    perm.REPORTS_READ, perm.ANALYTICS_READ
+)
 
 
 def _report_response(
@@ -73,7 +83,7 @@ def _report_response(
 @router.get("/stats", response_model=schemas.OverviewStatsResponse)
 def get_overview_stats(
     days: int = Query(default=14, ge=1, le=90),
-    current_user: User = Depends(require_reports_read),
+    current_user: User = Depends(require_stats_read),
     db: Session = Depends(get_session),
 ) -> schemas.OverviewStatsResponse:
     """Platform-wide aggregates + time series for the staff dashboards."""
@@ -139,6 +149,13 @@ def decide_report(
     current_user: User = Depends(require_reports_review),
     db: Session = Depends(get_session),
 ) -> mod_schemas.ReportResponse:
+    if body.decision == ModerationDecision.REMOVE_CONTENT:
+        granted = rbac_repository.permission_codes_for_user(db, current_user.id)
+        if perm.CONTENT_REMOVE not in granted:
+            raise ForbiddenError(
+                "You do not have permission to remove content",
+                code="FORBIDDEN",
+            )
     moderation_service.decide_report(
         db,
         moderator=current_user,
@@ -260,22 +277,90 @@ def set_account_status(
     return _admin_user(db, user)
 
 
+def _role_response(view: moderation_service.RoleView) -> schemas.RoleResponse:
+    return schemas.RoleResponse(
+        name=view.role.name,
+        description=view.role.description,
+        permissions=view.permissions,
+        holders=view.holders,
+    )
+
+
 @router.get("/roles", response_model=list[schemas.RoleResponse])
 def list_roles(
     current_user: User = Depends(require_staff_manage),
     db: Session = Depends(get_session),
 ) -> list[schemas.RoleResponse]:
     _ = current_user
+    return [_role_response(view) for view in moderation_service.list_role_catalog(db)]
+
+
+@router.get("/permissions", response_model=list[schemas.PermissionResponse])
+def list_permissions(
+    current_user: User = Depends(require_staff_manage),
+    db: Session = Depends(get_session),
+) -> list[schemas.PermissionResponse]:
+    _ = current_user
     return [
-        schemas.RoleResponse(
-            name=role.name,
-            description=role.description,
-            permissions=rbac_repository.permission_codes_for_role(
-                db, role.id
-            ),
-        )
-        for role in rbac_repository.list_roles(db)
+        schemas.PermissionResponse(code=p.code, description=p.description)
+        for p in moderation_service.list_permission_catalog(db)
     ]
+
+
+@router.post(
+    "/roles",
+    response_model=schemas.RoleResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_role(
+    body: schemas.RoleCreateRequest,
+    request: Request,
+    current_user: User = Depends(require_staff_manage),
+    db: Session = Depends(get_session),
+) -> schemas.RoleResponse:
+    view = moderation_service.create_staff_role(
+        db,
+        actor=current_user,
+        name=body.name,
+        description=body.description,
+        permissions=body.permissions,
+        request_id=get_request_id(request),
+    )
+    return _role_response(view)
+
+
+@router.patch("/roles/{role_name}", response_model=schemas.RoleResponse)
+def update_role(
+    role_name: str,
+    body: schemas.RoleUpdateRequest,
+    request: Request,
+    current_user: User = Depends(require_staff_manage),
+    db: Session = Depends(get_session),
+) -> schemas.RoleResponse:
+    view = moderation_service.update_staff_role(
+        db,
+        actor=current_user,
+        name=role_name,
+        description=body.description,
+        permissions=body.permissions,
+        request_id=get_request_id(request),
+    )
+    return _role_response(view)
+
+
+@router.delete("/roles/{role_name}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_role(
+    role_name: str,
+    request: Request,
+    current_user: User = Depends(require_staff_manage),
+    db: Session = Depends(get_session),
+) -> None:
+    moderation_service.delete_staff_role(
+        db,
+        actor=current_user,
+        name=role_name,
+        request_id=get_request_id(request),
+    )
 
 
 @router.post("/users/{user_id}/roles", response_model=schemas.AdminUserResponse)

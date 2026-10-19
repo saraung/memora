@@ -38,6 +38,23 @@ class RoleResponse(BaseModel):
     name: str
     description: str
     permissions: list[str]
+    holders: int = 0
+
+
+class PermissionResponse(BaseModel):
+    code: str
+    description: str
+
+
+class RoleCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=64)
+    description: str = Field(default="", max_length=255)
+    permissions: list[str] = Field(default_factory=list)
+
+
+class RoleUpdateRequest(BaseModel):
+    description: str = Field(default="", max_length=255)
+    permissions: list[str] = Field(default_factory=list)
 
 
 class AuditEventResponse(BaseModel):

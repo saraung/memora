@@ -5,7 +5,9 @@ import type {
   AdminUser,
   AdminUserDetail,
   AuditEvent,
+  Permission,
   Role,
+  RoleInput,
   StaffMember,
 } from "@/types/admin";
 import type { OverviewStats } from "@/types/analytics";
@@ -119,6 +121,25 @@ export const adminApi = {
   async listRoles(): Promise<Role[]> {
     const { data } = await api.get<Role[]>("/admin/roles");
     return data;
+  },
+
+  async listPermissions(): Promise<Permission[]> {
+    const { data } = await api.get<Permission[]>("/admin/permissions");
+    return data;
+  },
+
+  async createRole(payload: RoleInput): Promise<Role> {
+    const { data } = await api.post<Role>("/admin/roles", payload);
+    return data;
+  },
+
+  async updateRole(name: string, payload: RoleInput): Promise<Role> {
+    const { data } = await api.patch<Role>(`/admin/roles/${name}`, payload);
+    return data;
+  },
+
+  async deleteRole(name: string): Promise<void> {
+    await api.delete(`/admin/roles/${name}`);
   },
 
   async grantRole(userId: string, role: string): Promise<AdminUser> {

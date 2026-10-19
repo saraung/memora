@@ -103,13 +103,13 @@ export function UserDetailPage() {
         </span>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 lg:gap-6 sm:grid-cols-3">
         <MetricTile label="Followers" value={account.followers} />
         <MetricTile label="Following" value={account.following} />
         <MetricTile label="Posts" value={account.posts} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:gap-6 lg:grid-cols-2">
         <AccountStandingCard
           accountId={account.id}
           status={account.account_status}

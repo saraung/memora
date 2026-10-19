@@ -1551,6 +1551,14 @@ The application uses a persistent sidebar on desktop, a responsive navigation dr
 
 These routes define the frontend plan; they are not a claim that the corresponding backend endpoints already exist. Connect each page only when its API contract is implemented. Permission codes used here (e.g. `reports:read`, `staff:manage`) must be reconciled with the permission codes seeded in the backend (e.g. `reports:review`, `content:remove`, `users:suspend`) so there is a single permission vocabulary.
 
+Enforcement notes (implemented):
+
+- `/` (Overview) requires `reports:read`; its "Recent admin activity" panel additionally requires `audit:read` (the panel is hidden without it, since `/admin/audit-events` is gated by `audit:read`).
+- `/analytics` requires `analytics:read`. The shared `GET /admin/stats` endpoint it and the Overview both use accepts **either** `reports:read` or `analytics:read`.
+- Applying the `remove_content` moderation decision requires `reports:review` **and** `content:remove`; all other decisions need only `reports:review`.
+- `staff:manage` is a trusted capability: holders may create/edit roles and grant any role (including `admin`) to any user. There is intentionally no anti-escalation guard; treat it as equivalent to full administrative trust.
+- `settings:read` currently gates only the read-only Settings page (no settings API exists yet).
+
 ### 16.5 Technology stack
 
 Use the same frontend foundation as the public Memora app so development practices remain consistent.

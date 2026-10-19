@@ -42,6 +42,18 @@ export interface Role {
   name: string;
   description: string;
   permissions: string[];
+  holders: number;
+}
+
+export interface Permission {
+  code: string;
+  description: string;
+}
+
+export interface RoleInput {
+  name?: string;
+  description: string;
+  permissions: string[];
 }
 
 export interface RoleAssignment {

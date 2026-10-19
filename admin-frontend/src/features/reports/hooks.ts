@@ -51,7 +51,7 @@ export function useDecideReport(reportId: string) {
 }
 
 /** Pending-report count (capped display) + recent moderation activity. */
-export function useOverview() {
+export function useOverview(canAudit: boolean) {
   const pending = useInfiniteQuery({
     queryKey: reportKeys.list({ status: "pending", category: "" }),
     queryFn: () =>
@@ -63,6 +63,7 @@ export function useOverview() {
   const activity = useQuery({
     queryKey: reportKeys.audit,
     queryFn: () => adminApi.listAuditEvents({ limit: 8 }),
+    enabled: canAudit,
   });
 
   const pendingCount = pending.data?.pages[0]?.items.length ?? 0;

@@ -9,30 +9,77 @@ import {
   type NavItem,
 } from "@/components/navigation/nav-items";
 
-function Brand() {
+function Brand({ collapsed = false }: { collapsed?: boolean }) {
   return (
-    <div className="flex items-center gap-2.5 px-2">
-      <LogoMark className="size-8" />
-      <div className="leading-tight">
-        <p className="text-sm font-display font-extrabold text-1">
-          Memora Admin
-        </p>
-        <p className="text-[11px] text-3">Operations console</p>
-      </div>
+    <div
+      className={cn(
+        "flex items-center gap-2.5",
+        collapsed ? "justify-center px-0" : "px-2",
+      )}
+    >
+      <LogoMark className="size-8 shrink-0" />
+      {!collapsed && (
+        <div className="leading-tight">
+          <p className="text-sm font-display font-extrabold text-1">
+            Memora Admin
+          </p>
+          <p className="text-[11px] text-3">Operations console</p>
+        </div>
+      )}
     </div>
   );
 }
 
-function SidebarLinks({ onNavigate }: { onNavigate?: () => void }) {
+function isItemActive(item: NavItem, pathname: string): boolean {
+  if (item.to === "/") return pathname === "/";
+  return (
+    pathname === item.to ||
+    (item.matchPrefix != null && pathname.startsWith(`${item.matchPrefix}/`))
+  );
+}
+
+function SidebarLinks({
+  onNavigate,
+  collapsed = false,
+}: {
+  onNavigate?: () => void;
+  collapsed?: boolean;
+}) {
   const { hasPermission } = useAuth();
   const { pathname } = useLocation();
   const items = NAV_ITEMS.filter((item) => hasPermission(item.permission));
 
-  const isActive = (item: NavItem) =>
-    item.to === "/"
-      ? pathname === "/"
-      : pathname === item.to ||
-        (item.matchPrefix != null && pathname.startsWith(`${item.matchPrefix}/`));
+  if (collapsed) {
+    return (
+      <nav
+        className="flex flex-1 flex-col items-center gap-1 px-2"
+        aria-label="Primary"
+      >
+        {items.map((item) => {
+          const Icon = item.icon;
+          const active = isItemActive(item, pathname);
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/"}
+              onClick={onNavigate}
+              title={item.label}
+              aria-label={item.label}
+              className={cn(
+                "flex size-10 items-center justify-center rounded-lg transition-colors",
+                active
+                  ? "bg-sidebar-active text-primary"
+                  : "text-2 hover:bg-muted hover:text-1",
+              )}
+            >
+              <Icon className="size-5" aria-hidden />
+            </NavLink>
+          );
+        })}
+      </nav>
+    );
+  }
 
   return (
     <nav className="flex flex-1 flex-col gap-5 px-2" aria-label="Primary">
@@ -46,7 +93,7 @@ function SidebarLinks({ onNavigate }: { onNavigate?: () => void }) {
             </p>
             {groupItems.map((item) => {
               const Icon = item.icon;
-              const active = isActive(item);
+              const active = isItemActive(item, pathname);
               return (
                 <NavLink
                   key={item.to}
@@ -72,15 +119,22 @@ function SidebarLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-/** Desktop sidebar. */
-export function Sidebar() {
+/** Desktop sidebar (collapsible icon rail). */
+export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   return (
-    <aside className="hidden w-64 shrink-0 flex-col gap-6 border-r border-line bg-sidebar py-5 md:flex">
-      <Brand />
-      <SidebarLinks />
-      <p className="px-4 text-[11px] text-4">
-        Authorized staff only. Actions are audited.
-      </p>
+    <aside
+      className={cn(
+        "hidden shrink-0 flex-col gap-6 border-r border-line bg-sidebar py-5 transition-[width] duration-200 ease-out md:flex",
+        collapsed ? "w-[4.75rem]" : "w-64",
+      )}
+    >
+      <Brand collapsed={collapsed} />
+      <SidebarLinks collapsed={collapsed} />
+      {!collapsed && (
+        <p className="px-4 text-[11px] text-4">
+          Authorized staff only. Actions are audited.
+        </p>
+      )}
     </aside>
   );
 }

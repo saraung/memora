@@ -6,6 +6,7 @@ export const adminKeys = {
   user: (id: string) => ["admin", "users", "detail", id] as const,
   staff: ["admin", "staff"] as const,
   roles: ["admin", "roles"] as const,
+  permissions: ["admin", "permissions"] as const,
   audit: (filters: { action: string; targetType: string; actorId: string }) =>
     ["admin", "audit", filters] as const,
 };

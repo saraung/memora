@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -28,6 +29,7 @@ from app.domain.enums import (
 )
 from app.infrastructure.database.models.messaging import MessageReceipt
 from app.infrastructure.database.models.moderation import ModerationAction, Report
+from app.infrastructure.database.models.rbac import Role
 from app.infrastructure.database.models.user import User
 from app.infrastructure.database.repositories import (
     audit_repository,
@@ -554,4 +556,161 @@ def platform_overview(db: Session, *, days: int = 14) -> dict:
     from app.application.services import stats_service
 
     return stats_service.overview(db, days=days)
+
+
+# -- Role catalog management -------------------------------------------------
+
+ROLE_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
+PROTECTED_ROLE = "admin"
+
+
+@dataclass
+class RoleView:
+    role: Role
+    permissions: list[str]
+    holders: int
+
+
+def list_role_catalog(db: Session) -> list[RoleView]:
+    """Roles with their permission codes and member counts."""
+    return [
+        RoleView(
+            role=role,
+            permissions=rbac_repository.permission_codes_for_role(db, role.id),
+            holders=rbac_repository.count_role_holders(db, role.id),
+        )
+        for role in rbac_repository.list_roles(db)
+    ]
+
+
+def list_permission_catalog(db: Session) -> list:
+    """Every permission code staff can be granted."""
+    return rbac_repository.list_permissions(db)
+
+
+def _resolve_permissions(db: Session, codes: list[str]) -> list:
+    unique = sorted({code.strip() for code in codes if code.strip()})
+    resolved = []
+    for code in unique:
+        permission = rbac_repository.get_permission_by_code(db, code)
+        if permission is None:
+            raise ValidationError(
+                f"Unknown permission: {code}",
+                details={"field": "permissions"},
+            )
+        resolved.append(permission)
+    return resolved
+
+
+def create_staff_role(
+    db: Session,
+    *,
+    actor: User,
+    name: str,
+    description: str,
+    permissions: list[str],
+    request_id: str | None = None,
+) -> RoleView:
+    """Create a role and grant it an initial permission set."""
+    role_name = name.strip().lower()
+    if not ROLE_NAME_RE.match(role_name):
+        raise ValidationError(
+            "Role names use lowercase letters, digits, dashes or underscores",
+            details={"field": "name"},
+        )
+    if rbac_repository.get_role_by_name(db, role_name) is not None:
+        raise ConflictError("A role with that name already exists")
+    resolved = _resolve_permissions(db, permissions)
+    role = rbac_repository.create_role(
+        db, name=role_name, description=description.strip()
+    )
+    if resolved:
+        rbac_repository.set_role_permissions(
+            db, role_id=role.id, permission_ids=[p.id for p in resolved]
+        )
+    audit_repository.record(
+        db,
+        action="admin.role_create",
+        actor_id=actor.id,
+        target_type="role",
+        target_id=role.name,
+        request_id=request_id,
+        meta={"permissions": [p.code for p in resolved]},
+    )
+    return RoleView(
+        role=role,
+        permissions=rbac_repository.permission_codes_for_role(db, role.id),
+        holders=0,
+    )
+
+
+def update_staff_role(
+    db: Session,
+    *,
+    actor: User,
+    name: str,
+    description: str,
+    permissions: list[str],
+    request_id: str | None = None,
+) -> RoleView:
+    """Update a role's description and permission set."""
+    role = rbac_repository.get_role_by_name(db, name.strip().lower())
+    if role is None:
+        raise ResourceNotFoundError("Role not found")
+    resolved = _resolve_permissions(db, permissions)
+    codes = sorted(p.code for p in resolved)
+    if role.name == PROTECTED_ROLE:
+        all_codes = sorted(p.code for p in rbac_repository.list_permissions(db))
+        if codes != all_codes:
+            raise ForbiddenError(
+                "The administrator role always retains every permission"
+            )
+    role.description = description.strip()
+    rbac_repository.save_role(db, role)
+    rbac_repository.set_role_permissions(
+        db, role_id=role.id, permission_ids=[p.id for p in resolved]
+    )
+    audit_repository.record(
+        db,
+        action="admin.role_update",
+        actor_id=actor.id,
+        target_type="role",
+        target_id=role.name,
+        request_id=request_id,
+        meta={"permissions": codes},
+    )
+    return RoleView(
+        role=role,
+        permissions=rbac_repository.permission_codes_for_role(db, role.id),
+        holders=rbac_repository.count_role_holders(db, role.id),
+    )
+
+
+def delete_staff_role(
+    db: Session,
+    *,
+    actor: User,
+    name: str,
+    request_id: str | None = None,
+) -> None:
+    """Delete an empty role. Protected/held roles cannot be removed."""
+    role = rbac_repository.get_role_by_name(db, name.strip().lower())
+    if role is None:
+        raise ResourceNotFoundError("Role not found")
+    if role.name == PROTECTED_ROLE:
+        raise ForbiddenError("The administrator role cannot be deleted")
+    if rbac_repository.count_role_holders(db, role.id) > 0:
+        raise ConflictError(
+            "Remove every member from this role before deleting it"
+        )
+    rbac_repository.delete_role(db, role)
+    audit_repository.record(
+        db,
+        action="admin.role_delete",
+        actor_id=actor.id,
+        target_type="role",
+        target_id=role.name,
+        request_id=request_id,
+        meta=None,
+    )
 

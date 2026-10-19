@@ -55,6 +55,12 @@ vi.mock("@/features/analytics/hooks", () => ({
   }),
 }));
 
+const auth = vi.hoisted(() => ({ canAudit: true }));
+
+vi.mock("@/features/auth/useAuth", () => ({
+  useHasPermission: () => auth.canAudit,
+}));
+
 vi.mock("@/features/reports/hooks", () => ({
   useOverview: () => ({
     pendingCount: 4,
@@ -71,6 +77,7 @@ vi.mock("@/features/reports/hooks", () => ({
 
 describe("OverviewPage", () => {
   it("shows KPI figures and chart panels from the stats payload", () => {
+    auth.canAudit = true;
     render(
       <MemoryRouter>
         <OverviewPage />
@@ -84,5 +91,18 @@ describe("OverviewPage", () => {
     expect(screen.getByText("Reports by status")).toBeInTheDocument();
     expect(screen.getByText("Staff by role")).toBeInTheDocument();
     expect(screen.getByText("Administrator")).toBeInTheDocument();
+    expect(screen.getByText("Recent admin activity")).toBeInTheDocument();
+  });
+
+  it("hides the audit panel without audit:read", () => {
+    auth.canAudit = false;
+    render(
+      <MemoryRouter>
+        <OverviewPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("New signups")).toBeInTheDocument();
+    expect(screen.queryByText("Recent admin activity")).not.toBeInTheDocument();
   });
 });

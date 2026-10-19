@@ -36,3 +36,27 @@ def require_permission(code: str) -> Callable:
         return current_user
 
     return _dependency
+
+
+def require_any_permission(*codes: str) -> Callable:
+    """Build a dependency that passes when the user holds ANY of `codes`.
+
+    Usage: `user = Depends(require_any_permission("reports:read", "analytics:read"))`.
+    Denies by default when none of the permissions are held.
+    """
+
+    def _dependency(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_session),
+    ) -> User:
+        granted = rbac_repository.permission_codes_for_user(
+            db, current_user.id
+        )
+        if not any(code in granted for code in codes):
+            raise ForbiddenError(
+                "You do not have permission to perform this action",
+                code="FORBIDDEN",
+            )
+        return current_user
+
+    return _dependency

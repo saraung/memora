@@ -46,6 +46,10 @@ export function ReportDetailPage() {
   const { hasPermission } = useAuth();
   const { toast } = useToast();
   const canReview = hasPermission(PERM.REPORTS_REVIEW);
+  const canRemove = hasPermission(PERM.CONTENT_REMOVE);
+  const decisionOptions = DECISION_OPTIONS.filter(
+    (option) => option !== "remove_content" || canRemove,
+  );
 
   const [decision, setDecision] = useState<ModerationDecision>("dismiss");
   const [reason, setReason] = useState("");
@@ -204,7 +208,7 @@ export function ReportDetailPage() {
                     setDecision(e.target.value as ModerationDecision)
                   }
                 >
-                  {DECISION_OPTIONS.map((d) => (
+                  {decisionOptions.map((d) => (
                     <option key={d} value={d}>
                       {DECISION_LABELS[d]}
                     </option>

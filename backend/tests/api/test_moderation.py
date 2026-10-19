@@ -40,6 +40,20 @@ def _grant(client: TestClient, db: Session, user: dict, role: str):
     rbac_repository.grant_role(db, user_id=user["id"], role_id=role_obj.id)
 
 
+def _make_role(db: Session, name: str, codes: list[str]):
+    role = rbac_repository.get_role_by_name(db, name)
+    if role is None:
+        role = rbac_repository.create_role(db, name=name)
+    for code in codes:
+        permission = rbac_repository.get_permission_by_code(db, code)
+        if permission is None:
+            permission = rbac_repository.create_permission(db, code=code)
+        rbac_repository.grant_permission_to_role(
+            db, role_id=role.id, permission_id=permission.id
+        )
+    return role
+
+
 @pytest.fixture()
 def fake_storage(client: TestClient):
     storage = FakeStorageProvider()
@@ -315,7 +329,7 @@ def test_user_search_and_report_permissions(
 
 
 def test_dashboard_stats_endpoint(
-    client: TestClient, staff: dict
+    client: TestClient, staff: dict, db: Session
 ) -> None:
     alice, alice_h = _alice(client)
     _, admin_h = staff["admin"]
@@ -332,6 +346,83 @@ def test_dashboard_stats_endpoint(
     assert body["staff"]["total"] >= 2
     assert isinstance(body["reports_by_category"], list)
     assert isinstance(body["posts_series"], list)
+
+    # analytics:read alone is sufficient for the shared stats endpoint.
+    analyst, analyst_h = _register(
+        client, email="analyst@example.com", username="analyst1",
+        password="supersecret1",
+    )
+    _make_role(db, "analyst", ["analytics:read"])
+    _grant(client, db, analyst, "analyst")
+    analytics_only = client.get(f"{ADMIN}/stats", headers=analyst_h)
+    assert analytics_only.status_code == 200, analytics_only.text
+
+    # Any other unrelated permission is not enough.
+    settings_user, settings_h = _register(
+        client, email="settings@example.com", username="settings1",
+        password="supersecret1",
+    )
+    _make_role(db, "settings-only", ["settings:read"])
+    _grant(client, db, settings_user, "settings-only")
+    assert client.get(f"{ADMIN}/stats", headers=settings_h).status_code == 403
+
+
+def test_remove_content_requires_content_remove_permission(
+    client: TestClient, staff: dict, fake_storage, db: Session
+) -> None:
+    alice, alice_h = _alice(client)
+    post = _post_with_media(client, alice_h, fake_storage, "spammy")
+    _, admin_h = staff["admin"]
+
+    # reports:review without content:remove.
+    reviewer, reviewer_h = _register(
+        client, email="reviewer@example.com", username="reviewer1",
+        password="supersecret1",
+    )
+    _make_role(db, "reviewer", ["reports:read", "reports:review"])
+    _grant(client, db, reviewer, "reviewer")
+
+    def _file() -> str:
+        response = client.post(
+            "/api/v1/reports",
+            headers=reviewer_h,
+            json={
+                "target_type": "post",
+                "target_id": post["id"],
+                "category": "spam",
+                "details": "looks like spam",
+            },
+        )
+        assert response.status_code == 201, response.text
+        return response.json()["id"]
+
+    # Non-destructive decisions need only reports:review.
+    dismissed = _file()
+    ok = client.post(
+        f"{ADMIN}/reports/{dismissed}/actions",
+        headers=reviewer_h,
+        json={"decision": "dismiss", "reason": "not spam"},
+    )
+    assert ok.status_code == 200, ok.text
+
+    # Removing content additionally requires content:remove.
+    to_remove = _file()
+    blocked = client.post(
+        f"{ADMIN}/reports/{to_remove}/actions",
+        headers=reviewer_h,
+        json={"decision": "remove_content", "reason": "confirmed spam"},
+    )
+    assert blocked.status_code == 403, blocked.text
+
+    # A holder of content:remove (admin) succeeds.
+    allowed = client.post(
+        f"{ADMIN}/reports/{to_remove}/actions",
+        headers=admin_h,
+        json={"decision": "remove_content", "reason": "confirmed spam"},
+    )
+    assert allowed.status_code == 200, allowed.text
+    assert client.get(f"/api/v1/posts/{post['id']}", headers=alice_h).status_code == 404
+
 
 
 def test_user_detail_endpoint(
@@ -390,3 +481,114 @@ def test_staff_directory_requires_staff_manage(
     assert {"admin1", "mod1"} <= usernames
     for member in members:
         assert member["roles"]
+
+
+def test_role_catalog_management(
+    client: TestClient, staff: dict
+) -> None:
+    alice, alice_h = _alice(client)
+    _, admin_h = staff["admin"]
+
+    permissions = client.get(f"{ADMIN}/permissions", headers=admin_h)
+    assert permissions.status_code == 200, permissions.text
+    codes = {item["code"] for item in permissions.json()}
+    assert {"reports:read", "staff:manage"} <= codes
+    assert (
+        client.get(f"{ADMIN}/permissions", headers=alice_h).status_code == 403
+    )
+
+    created = client.post(
+        f"{ADMIN}/roles",
+        headers=admin_h,
+        json={
+            "name": "triage",
+            "description": "Triage queue",
+            "permissions": ["reports:read", "reports:review"],
+        },
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["name"] == "triage"
+    assert sorted(body["permissions"]) == ["reports:read", "reports:review"]
+    assert body["holders"] == 0
+
+    duplicate = client.post(
+        f"{ADMIN}/roles",
+        headers=admin_h,
+        json={"name": "triage", "permissions": []},
+    )
+    assert duplicate.status_code == 409
+
+    unknown = client.post(
+        f"{ADMIN}/roles",
+        headers=admin_h,
+        json={"name": "weird", "permissions": ["nope:x"]},
+    )
+    assert unknown.status_code == 422
+
+    bad_name = client.post(
+        f"{ADMIN}/roles",
+        headers=admin_h,
+        json={"name": "Bad Name", "permissions": []},
+    )
+    assert bad_name.status_code == 422
+
+    assert (
+        client.post(
+            f"{ADMIN}/roles",
+            headers=alice_h,
+            json={"name": "rogue", "permissions": []},
+        ).status_code
+        == 403
+    )
+
+    updated = client.patch(
+        f"{ADMIN}/roles/triage",
+        headers=admin_h,
+        json={
+            "description": "Triage queue v2",
+            "permissions": ["reports:read", "users:read"],
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert sorted(updated.json()["permissions"]) == [
+        "reports:read",
+        "users:read",
+    ]
+    assert updated.json()["description"] == "Triage queue v2"
+
+    # The administrator role must always retain every permission.
+    assert (
+        client.patch(
+            f"{ADMIN}/roles/admin",
+            headers=admin_h,
+            json={"description": "Root", "permissions": ["reports:read"]},
+        ).status_code
+        == 403
+    )
+
+    granted = client.post(
+        f"{ADMIN}/users/{alice['id']}/roles",
+        headers=admin_h,
+        json={"role": "triage"},
+    )
+    assert granted.status_code == 200, granted.text
+    assert (
+        client.delete(f"{ADMIN}/roles/triage", headers=admin_h).status_code
+        == 409
+    )
+
+    assert (
+        client.delete(
+            f"{ADMIN}/users/{alice['id']}/roles/triage", headers=admin_h
+        ).status_code
+        == 200
+    )
+    assert (
+        client.delete(f"{ADMIN}/roles/triage", headers=admin_h).status_code
+        == 204
+    )
+    assert (
+        client.delete(f"{ADMIN}/roles/admin", headers=admin_h).status_code
+        == 403
+    )

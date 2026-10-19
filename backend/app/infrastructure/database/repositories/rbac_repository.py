@@ -44,6 +44,19 @@ def create_role(
     return role
 
 
+def save_role(session: Session, role: Role) -> Role:
+    session.add(role)
+    session.commit()
+    session.refresh(role)
+    return role
+
+
+def delete_role(session: Session, role: Role) -> None:
+    """Delete a role (its permission links cascade at the DB level)."""
+    session.delete(role)
+    session.commit()
+
+
 def create_permission(
     session: Session, *, code: str, description: str = ""
 ) -> Permission:
@@ -126,6 +139,20 @@ def grant_permission_to_role(
     session.commit()
     session.refresh(link)
     return link
+
+
+def set_role_permissions(
+    session: Session, *, role_id: uuid.UUID, permission_ids: list[uuid.UUID]
+) -> None:
+    """Replace a role's permission set with exactly ``permission_ids``."""
+    existing = session.exec(
+        select(RolePermission).where(RolePermission.role_id == role_id)
+    ).all()
+    for link in existing:
+        session.delete(link)
+    for permission_id in sorted(set(permission_ids), key=str):
+        session.add(RolePermission(role_id=role_id, permission_id=permission_id))
+    session.commit()
 
 
 def permission_codes_for_user(

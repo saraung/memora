@@ -1,9 +1,14 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ShieldCheck, Users } from "lucide-react";
+import { Pencil, Plus, ShieldCheck, Trash2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Avatar } from "@/components/ui/Avatar";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/Toast";
 import { AccountStatusBadge } from "@/components/admin/AccountStatusBadge";
+import { RoleDialog } from "@/components/staff/RoleDialog";
 import {
   Table,
   TableBody,
@@ -13,7 +18,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState, ErrorState, PageHeader } from "@/components/feedback/StateViews";
-import { useRoles, useStaff } from "@/features/staff/hooks";
+import {
+  useDeleteRole,
+  usePermissions,
+  useRoles,
+  useStaff,
+} from "@/features/staff/hooks";
 import { formatDate } from "@/lib/format";
 import { roleLabel } from "@/lib/labels";
 import type { Role } from "@/types/admin";
@@ -21,12 +31,36 @@ import type { Role } from "@/types/admin";
 export function StaffPage() {
   const roles = useRoles();
   const staff = useStaff();
+  const permissions = usePermissions();
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Role | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Role | null>(null);
+  const { toast } = useToast();
+  const remove = useDeleteRole();
+
+  const holdersOf = (name: string) =>
+    staff.data?.filter((member) => member.roles.includes(name)).length ?? 0;
+
+  const openCreate = () => {
+    setEditing(null);
+    setDialogOpen(true);
+  };
+  const openEdit = (role: Role) => {
+    setEditing(role);
+    setDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Staff & roles"
-        description="Role catalog, permissions, and who holds what."
+        description="Create roles, shape their permissions, and see who holds what."
+        actions={
+          <Button onClick={openCreate} disabled={permissions.isPending}>
+            <Plus className="size-4" aria-hidden /> New role
+          </Button>
+        }
       />
 
       <section className="space-y-4">
@@ -36,21 +70,20 @@ export function StaffPage() {
         {roles.isError ? (
           <ErrorState title="Could not load roles" onRetry={() => void roles.refetch()} />
         ) : roles.isPending ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 lg:gap-6 md:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-40 w-full" />
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 lg:gap-6 md:grid-cols-2 xl:grid-cols-3">
             {roles.data.map((role) => (
               <RoleCard
                 key={role.name}
                 role={role}
-                holders={
-                  staff.data?.filter((m) => m.roles.includes(role.name))
-                    .length ?? 0
-                }
+                holders={holdersOf(role.name)}
+                onEdit={() => openEdit(role)}
+                onDelete={() => setPendingDelete(role)}
               />
             ))}
           </div>
@@ -131,13 +164,54 @@ export function StaffPage() {
           </Table>
         )}
       </section>
+
+      <RoleDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        role={editing}
+        permissions={permissions.data ?? []}
+      />
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        danger
+        title={`Delete ${pendingDelete ? roleLabel(pendingDelete.name) : "role"}?`}
+        description="This permanently removes the role. It must have no members."
+        confirmLabel="Delete role"
+        loading={remove.isPending}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          remove.mutate(pendingDelete.name, {
+            onSuccess: () => {
+              toast("Role deleted.", "success");
+              setPendingDelete(null);
+            },
+            onError: (error) => {
+              toast((error as Error).message, "error");
+              setPendingDelete(null);
+            },
+          });
+        }}
+      />
     </div>
   );
 }
 
-function RoleCard({ role, holders }: { role: Role; holders: number }) {
+function RoleCard({
+  role,
+  holders,
+  onEdit,
+  onDelete,
+}: {
+  role: Role;
+  holders: number;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const isProtected = role.name === "admin";
   return (
-    <div className="rounded-xl border border-line bg-surface p-5 shadow-card">
+    <div className="flex flex-col rounded-xl border border-line bg-surface p-5 shadow-card">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-display text-base font-extrabold text-1">
@@ -147,9 +221,12 @@ function RoleCard({ role, holders }: { role: Role; holders: number }) {
             {role.description || "No description."}
           </p>
         </div>
-        <Badge variant="neutral">{holders} holder{holders === 1 ? "" : "s"}</Badge>
+        <Badge variant="neutral">
+          {holders} holder{holders === 1 ? "" : "s"}
+        </Badge>
       </div>
-      <div className="mt-4 flex flex-wrap gap-1.5">
+
+      <div className="mt-4 flex flex-1 flex-wrap content-start gap-1.5">
         {role.permissions.length === 0 ? (
           <span className="text-xs text-3">No permissions</span>
         ) : (
@@ -159,6 +236,27 @@ function RoleCard({ role, holders }: { role: Role; holders: number }) {
             </Badge>
           ))
         )}
+      </div>
+
+      <div className="mt-4 flex items-center gap-2 border-t border-line pt-4">
+        <Button variant="outline" size="sm" onClick={onEdit}>
+          <Pencil className="size-3.5" aria-hidden /> Edit
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDelete}
+          disabled={isProtected || holders > 0}
+          title={
+            isProtected
+              ? "The administrator role cannot be deleted"
+              : holders > 0
+                ? "Remove all members before deleting"
+                : "Delete role"
+          }
+        >
+          <Trash2 className="size-3.5" aria-hidden /> Delete
+        </Button>
       </div>
     </div>
   );
